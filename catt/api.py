@@ -11,6 +11,8 @@ from .error import APIError
 from .error import CastError
 from .stream_info import StreamInfo
 
+import click
+
 
 def discover() -> list:
     """Perform discovery of devices present on local network, and return result."""
@@ -109,7 +111,7 @@ class CattDevice:
 
     def pause(self) -> None:
         """Pause playback of content."""
-
+        click.echo("vgr pause")
         self.controller.prep_control()
         self.controller.pause()
 

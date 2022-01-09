@@ -9,6 +9,9 @@ from pathlib import Path
 from typing import Optional
 from typing import Tuple
 
+#
+import click
+
 BYTE_RANGE_RE = re.compile(r"bytes=(\d+)-(\d+)?$")
 
 
@@ -73,6 +76,7 @@ def serve_file(
             return super(FileHandler, self).log_message(format, *args, **kwargs)
 
         def do_GET(self):  # noqa
+            click.echo("DO GET")
             if "Range" not in self.headers:
                 first, last = 0, stats.st_size
             else:
@@ -127,9 +131,13 @@ def serve_file(
     mediapath = Path(filename)
     stats = mediapath.stat()
 
+    #click.echo("before TCPServer")
     httpd = socketserver.TCPServer((address, port), FileHandler)
+    #click.echo("after TCPServer")
     if single_req:
+        #click.echo("handle_request")
         httpd.handle_request()
     else:
+        click.echo("serve_forever")
         httpd.serve_forever()
     httpd.server_close()

@@ -1,7 +1,9 @@
 import random
+import os
 from pathlib import Path
 
 import yt_dlp
+import click
 
 from .error import ExtractionError
 from .error import FormatError
@@ -36,6 +38,8 @@ class StreamInfo:
         self._throw_ytdl_dl_errs = throw_ytdl_dl_errs
         self.local_ip = get_local_ip(device_info["ip"]) if device_info else None
         self.port = random.randrange(45000, 47000) if device_info else None
+        self.txt_file = None
+        self.is_txt_file = False
 
         if "://" in video_url:
             self._ydl = yt_dlp.YoutubeDL(dict(ytdl_options) if ytdl_options else DEFAULT_YTDL_OPTS)
@@ -68,9 +72,34 @@ class StreamInfo:
                 self._info = self._get_stream_info(vpreinfo) if "entries" not in vpreinfo else None
             else:
                 self._info = self._get_stream_info(self._preinfo)
+        elif ".txt" in video_url:
+            with open(video_url) as file:
+                self._txt_entries = file.read().splitlines()
+            for line in self._txt_entries:
+                click.echo("self._txt_entries: " + line)
+            self.txt_file = video_url
+            self._local_file = self._txt_entries[0]
+            self.is_local_file = True
+            self.is_txt_file = True
         else:
             self._local_file = video_url
             self.is_local_file = True
+
+    @property
+    def txt_file_dirname(self):
+        if self.is_local_file:
+            return os.path.dirname(self.txt_file)
+
+    @property
+    def txt_file_length(self):
+        return len(self._txt_entries) if self.is_txt_file else None
+
+    @property
+    def txt_file_all_entries(self):
+        if self.is_local_file and self._txt_entries and self._txt_entries[0]:
+            return self._txt_entries
+        else:
+            return None
 
     @property
     def is_remote_file(self):

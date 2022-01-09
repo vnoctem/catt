@@ -22,6 +22,8 @@ from .error import StateFileError
 from .stream_info import StreamInfo
 from .util import echo_warning
 
+import click
+
 GOOGLE_MEDIA_NAMESPACE = "urn:x-cast:com.google.cast.media"
 VALID_STATE_EVENTS = ["UNKNOWN", "IDLE", "BUFFERING", "PLAYING", "PAUSED"]
 CLOUD_APP_ID = "38579375"
@@ -52,6 +54,7 @@ def get_app(id_or_name: str, cast_type: Optional[str] = None, strict: bool = Fal
             return DEFAULT_APP
 
     if app.name == "default":
+        click.echo("default app")
         return app
 
     if not cast_type:
@@ -415,6 +418,7 @@ class MediaControllerMixin:
 
     def pause(self):
         self._cast.media_controller.pause()
+        click.echo("2 pause")
 
     def play_toggle(self):
         state = self._cast.media_controller.status.player_state

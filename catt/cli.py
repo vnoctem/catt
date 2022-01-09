@@ -3,6 +3,7 @@ import configparser
 import random
 import sys
 import time
+import os
 from pathlib import Path
 from threading import Thread
 from urllib.parse import urlparse
@@ -121,11 +122,17 @@ def fail_if_no_ip(ipaddr):
 
 
 def create_server_thread(filename, address, port, content_type, single_req=False):
+    click.echo("create_server_thread")
     thr = Thread(target=serve_file, args=(filename, address, port, content_type, single_req))
     thr.setDaemon(True)
     thr.start()
     return thr
 
+def create_server_thread_without_daemon(filename, address, port, content_type, single_req=False):
+    click.echo("create_server_thread_second")
+    thr = Thread(target=serve_file, args=(filename, address, port, content_type, single_req), daemon=False)
+    thr.start()
+    return thr
 
 CONTEXT_SETTINGS = dict(help_option_names=["-h", "--help"])
 
@@ -227,7 +234,7 @@ def cast(
     media_is_image = stream.guessed_content_category == "image"
     local_or_remote = "local" if stream.is_local_file else "remote"
 
-    if stream.is_local_file:
+    if stream.is_local_file and not stream.is_txt_file:
         fail_if_no_ip(stream.local_ip)
         st_thr = create_server_thread(
             video_url,
@@ -236,6 +243,24 @@ def cast(
             stream.guessed_content_type,
             single_req=media_is_image,
         )
+    elif stream.is_local_file and stream.is_txt_file:
+        if stream.txt_file_length == 0:
+            cst.kill(idle_only=True)
+            raise CliError("Text file is empty")
+        else:
+            fail_if_no_ip(stream.local_ip)
+            audio_filepath = os.path.join(stream.txt_file_dirname, stream.txt_file_all_entries[0])
+            click.echo("*** testvgr: stream.is_txt_file " + audio_filepath)
+            click.echo("*** stream.port " + str(stream.port))
+
+            st_thr = create_server_thread_without_daemon(
+                audio_filepath,
+                stream.local_ip,
+                stream.port,
+                stream.guessed_content_type,
+                single_req=media_is_image,
+            )
+            click.echo("real end")
     elif stream.is_playlist and not (no_playlist and stream.video_id):
         if stream.playlist_length == 0:
             cst.kill(idle_only=True)
@@ -268,6 +293,10 @@ def cast(
                 single_req=True,
             )
 
+        if stream.is_txt_file:
+            click.echo("Reading local playlist from file {}".format(video_url))
+            audio_filepath = os.path.join(stream.txt_file_dirname, stream.txt_file_all_entries[0])
+            click.echo("Casting {} file {}...".format(local_or_remote, audio_filepath))
         click.echo("Casting {} file {}...".format(local_or_remote, video_url))
         click.echo(
             '{} "{}" on "{}"...'.format(
@@ -296,8 +325,31 @@ def cast(
         if not cst.wait_for(["PLAYING"], timeout=WAIT_PLAY_TIMEOUT):
             raise CliError("Playback of {} file has failed".format(local_or_remote))
         cst.wait_for(["UNKNOWN", "IDLE"])
+
+        time.sleep(1)
+
+        #vgr
+        if stream.is_txt_file:
+            #cst.kill(force=True)
+            click.echo("before sleep")
+            time.sleep(1)
+
+            fail_if_no_ip(stream.local_ip)
+            audio_filepath = os.path.join(stream.txt_file_dirname, stream.txt_file_all_entries[0])
+
+            click.echo("after sleep, next song: " + audio_filepath)
+            click.echo("*** stream.port " + str(stream.port))
+            st_thr = create_server_thread_without_daemon(
+                audio_filepath,
+                stream.local_ip,
+                stream.port,
+                stream.guessed_content_type,
+                single_req=media_is_image,
+            )
+            click.echo("real end")
     elif (stream.is_local_file and media_is_image) or subs:
         while (st_thr and st_thr.is_alive()) or (su_thr and su_thr.is_alive()):
+            click.echo("while (st_thr and st_thr.is_alive())")
             time.sleep(1)
 
 
@@ -361,6 +413,7 @@ def clear(settings):
 @cli.command(short_help="Pause a video.")
 @click.pass_obj
 def pause(settings):
+    click.echo("1 pause")
     cst = setup_cast(settings["selected_device"], action="pause", prep="control")
     cst.pause()
 
